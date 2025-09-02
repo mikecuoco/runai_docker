@@ -1,0 +1,69 @@
+channels:
+  - pytorch
+  - nvidia
+  - huggingface
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python>=3.11
+
+  # PyTorch ecosystem (specify versions for better caching)
+  - pytorch::pytorch>=2.5
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - pytorch::torchtext
+  - pytorch::pytorch-cuda
+  - pytorch::lightning>=2.5.3
+  - tensorboard
+  - torch-tb-profiler
+  
+  # Core tools
+  - gh
+  - ipdb
+  - certifi
+  - nvtop
+  - pytest
+  
+  # Jupyter ecosystem
+  - jupyterlab
+  - jupyter
+  - ipywidgets
+  - ipykernel
+  
+  # ML/AI libraries
+  - optuna
+  - optuna-integration
+  - numpy
+  - numba
+  - scikit-learn
+  - einops
+  - opt_einsum
+  - huggingface::transformers
+
+  # Data processing
+  - opencv
+  - polars
+  - pyfaidx
+  - pandas>=2
+  - pysam
+  - pybigwig
+  - bioframe
+  - parquet-tools
+  - pybedtools
+  - seaborn
+  - statannotations
+  - pyliftover
+  - h5py
+  
+  # Configuration and utilities
+  - hydra-core
+  - omegaconf
+  - typer
+  - loguru
+  - tqdm
+  - rich
+  - wandb
+  - torchinfo
+  - py-spy
+

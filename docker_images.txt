@@ -1,0 +1,14 @@
+# Docker images configuration file
+# Format: image_name	dockerfile_path	options
+# Lines starting with # are ignored
+#
+# Options:
+#   base_directory_build - build from repo root instead of dockerfile directory
+#   ssh_enabled - image includes SSH server configuration
+#
+# All images now use conda-lock by default for reproducible builds
+
+# Unified stack targets (root Dockerfile)
+mamba-gvl		Dockerfile		base_directory_build,ssh_enabled
+mamba-gvl-micro		Dockerfile		base_directory_build,ssh_enabled 
+parabricks-gvl		Dockerfile		base_directory_build,ssh_enabled
