@@ -1,53 +1,54 @@
-# syntax=docker/dockerfile:1.6
-# Multi-target stack Dockerfile for GVL images (root paths)
-
-# ============ Base: micromamba minimal ============
-FROM mambaorg/micromamba:2.3.2 AS base-micromamba
-ARG ENVIRONMENT_FILE=gvl.yml
-USER root
-
-# Files
-COPY apt-packages.txt /apt-packages.txt
-COPY environments/ /tmp/env/
-COPY configs/ssh/sshd_config /etc/ssh/sshd_config
-COPY scripts/user-setup.sh /root/user-setup.sh
-
-# Packages and SSHD dir
-RUN apt-get update && \
-xargs -a /apt-packages.txt -r apt-get install -y --no-install-recommends && \
-apt-get clean && rm -rf /var/lib/apt/lists/* && \
-mkdir -p /var/run/sshd && chmod 755 /var/run/sshd
-
-# Generate SSH host keys at build time
-RUN ssh-keygen -A
-
-# User setup
-RUN chmod +x /root/user-setup.sh && \
-NEW_USER=${NEW_USER} NEW_USER_ID=${NEW_USER_ID} NEW_USER_GID=${NEW_USER_GID} /root/user-setup.sh
-
-# micromamba root prefix and env install
-ENV NEW_USER=mcuoco NEW_USER_ID=2022 NEW_USER_GID=2022
-
-# MAMBA_ROOT_PREFIX and MAMBA_EXE exist from parent image
-RUN mkdir -p "$MAMBA_ROOT_PREFIX" && \
-chown -R ${NEW_USER_ID}:${NEW_USER_GID} "$MAMBA_ROOT_PREFIX" && \
-$MAMBA_EXE install --yes --root-prefix "$MAMBA_ROOT_PREFIX" --name base --file "/tmp/env/${ENVIRONMENT_FILE}" && \
-$MAMBA_EXE clean --all --yes && \
-chown -R ${NEW_USER_ID}:${NEW_USER_GID} "$MAMBA_ROOT_PREFIX"
-
-# Dotfiles setup as user
-USER $NEW_USER
-COPY scripts/setup-dotfiles.sh /home/${NEW_USER}/setup-dotfiles.sh
-COPY scripts/user_post_setup.sh /home/${NEW_USER}/user_post_setup.sh
-RUN /home/${NEW_USER}/setup-dotfiles.sh && /home/${NEW_USER}/user_post_setup.sh
-
-
-# ============ Target: mamba-gvl-micro ============
-FROM base-micromamba AS mamba-gvl-micro
+FROM mambaorg/micromamba:2.3.2 AS mamba-gvl-micro
 LABEL maintainer="Mike Cuoco <mcuoco@salk.edu>"
 LABEL build.type="locked"
 LABEL build.reproducible="true"
-ENV CONDA_DEFAULT_ENV=base
-EXPOSE 22 6006
+
+# Environment file
+ARG ENVIRONMENT_FILE=gvl.yml
+# SSH public key
+ARG SSH_PUBLIC_KEY=""
+# Create your user
+ARG NEW_MAMBA_USER=mcuoco
+ARG NEW_MAMBA_USER_ID=2022
+ARG NEW_MAMBA_USER_GID=2022
+
 USER root
-CMD ["/usr/sbin/sshd", "-D"]
+
+# Locale
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
+# Install apt packages
+COPY apt-packages.txt /apt-packages.txt
+RUN apt-get update && \
+    xargs -a /apt-packages.txt -r apt-get install -y --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /var/run/sshd
+
+# SSH config and helper scripts
+COPY configs/ssh/sshd_config /etc/ssh/sshd_config
+COPY scripts/sshd-start.sh /usr/local/bin/sshd-start.sh
+RUN chmod +x /usr/local/bin/sshd-start.sh
+
+RUN usermod "--login=${NEW_MAMBA_USER}" "--home=/home/${NEW_MAMBA_USER}" \
+        --move-home "-u ${NEW_MAMBA_USER_ID}" "${MAMBA_USER}" && \
+    groupmod "--new-name=${NEW_MAMBA_USER}" \
+        "-g ${NEW_MAMBA_USER_GID}" "${MAMBA_USER}" && \
+    # Update the expected value of MAMBA_USER for the
+    # _entrypoint.sh consistency check.
+    echo "${NEW_MAMBA_USER}" > "/etc/arg_mamba_user" && \
+    :
+ENV MAMBA_USER=$NEW_MAMBA_USER
+
+# Dotfiles and init scripts, as these change most often
+USER $MAMBA_USER
+COPY scripts/setup-dotfiles.sh /home/${MAMBA_USER}/setup-dotfiles.sh
+RUN /home/${MAMBA_USER}/setup-dotfiles.sh
+
+# Install micromamba environment as user
+COPY environments/ /home/${MAMBA_USER}/environments/
+RUN micromamba install --yes --name base --file "/home/${MAMBA_USER}/environments/${ENVIRONMENT_FILE}" && \
+    micromamba clean --all --yes
+
+# expose ports
+EXPOSE 22 6006
+
