@@ -10,6 +10,9 @@ PUSH=false
 LOAD=false
 BUILD_ALL=false
 TARGET_IMAGE=""
+PLATFORM="linux/amd64"
+BUILD_ARGS=()
+ENV_FILE_ARG=""
 
 show_help() {
     cat << EOF
@@ -22,14 +25,20 @@ OPTIONS:
     --push       Push to registry after build
     --load       Load image locally
     --tag TAG    Set image tag (default: latest)
+    --platform PLAT[,PLAT]  Set platform(s), e.g. linux/amd64 or linux/amd64,linux/arm64
+    --build-arg KEY=VAL     Pass build-arg to docker build (repeatable)
+    --env-file FILE         Convenience: sets build-arg ENVIRONMENT_FILE=FILE
     --list       List available images
     -h, --help   Show this help
 
 EXAMPLES:
-    $0 --all                    # Build all images
-    $0 mamba-gvl               # Build specific image
-    $0 --load mamba-gvl-micro  # Build and load locally
-    $0 --push --tag v1.0 --all # Build and push all
+    $0 --all                                 # Build all images
+    $0 mamba-gvl                              # Build specific image
+    $0 --load mamba-gvl-micro                 # Build and load locally
+    $0 --push --tag v1.0 --all                # Build and push all
+    $0 --platform linux/amd64,linux/arm64 \
+       --push mamba-gvl-micro                 # Multi-arch build
+    $0 --env-file gvl-linux-64.lock mamba-gvl # Use specific env file
 
 EOF
 }
@@ -63,7 +72,36 @@ build_image() {
     
     # Build command
     local full_image_name="${REGISTRY}${image_name}:${TAG}"
-    local build_cmd="docker build -t $full_image_name -f $dockerfile_path $build_context"
+    local build_cmd="docker buildx build --platform $PLATFORM -t $full_image_name -f $dockerfile_path"
+
+    # If building from a multi-stage Dockerfile, target the stage named after the image
+    if [[ "$(basename "$dockerfile_path")" == "Dockerfile" ]]; then
+        build_cmd+=" --target ${image_name}"
+    fi
+    
+    # Append build args
+    for arg in "${BUILD_ARGS[@]}"; do
+        build_cmd+=" --build-arg ${arg}"
+    done
+    
+    # Env file convenience
+    if [[ -n "$ENV_FILE_ARG" ]]; then
+        build_cmd+=" --build-arg ENVIRONMENT_FILE=${ENV_FILE_ARG}"
+    fi
+    
+    # Load or push behavior
+    if [[ "$PUSH" == true ]]; then
+        build_cmd+=" --push"
+    elif [[ "$LOAD" == true ]]; then
+        # buildx: use --load only for single-platform builds
+        if [[ "$PLATFORM" == *","* ]]; then
+            echo "Error: --load cannot be used with multiple platforms" >&2
+            return 1
+        fi
+        build_cmd+=" --load"
+    fi
+    
+    build_cmd+=" $build_context"
     
     echo "Running: $build_cmd"
     eval "$build_cmd"
@@ -72,10 +110,7 @@ build_image() {
         echo "Loading $full_image_name to local Docker..."
     fi
     
-    if [[ "$PUSH" == true ]]; then
-        echo "Pushing $full_image_name..."
-        docker push "$full_image_name"
-    fi
+    # Pushing handled by buildx when --push is used
     
     echo "✅ Built: $full_image_name"
 }
@@ -97,6 +132,30 @@ while [[ $# -gt 0 ]]; do
             ;;
         --tag)
             TAG="$2"
+            shift 2
+            ;;
+        --platform)
+            if [[ -z "$2" ]]; then
+                echo "Error: Missing argument for --platform" >&2
+                exit 1
+            fi
+            PLATFORM="$2"
+            shift 2
+            ;;
+        --build-arg)
+            if [[ -z "$2" ]]; then
+                echo "Error: Missing argument for --build-arg" >&2
+                exit 1
+            fi
+            BUILD_ARGS+=("$2")
+            shift 2
+            ;;
+        --env-file)
+            if [[ -z "$2" ]]; then
+                echo "Error: Missing argument for --env-file" >&2
+                exit 1
+            fi
+            ENV_FILE_ARG="$2"
             shift 2
             ;;
         --list)

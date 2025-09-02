@@ -1,0 +1,1 @@
+./build.sh --platform linux/arm64 --load --env-file test.yml mamba-gvl-micro 
