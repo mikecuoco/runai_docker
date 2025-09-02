@@ -10,4 +10,5 @@ if command -v micromamba >/dev/null 2>&1; then
   eval "$(micromamba shell hook -s bash)" || true
   micromamba activate base >/dev/null 2>&1 || true
 fi
+set -e
 EOT
