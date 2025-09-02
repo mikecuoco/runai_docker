@@ -7,20 +7,20 @@ This repository contains Docker images and configurations for RunAI development 
 ## 🏗️ Project Structure
 
 ```
-runai/
-├── shared/                          # Shared resources for all images
-│   ├── environments/
-│   │   ├── gvl.yml                 # Common conda environment
-│   ├── scripts/
-│   │   ├── setup-dotfiles.sh       # Dotfiles setup script
-│   │   └── generate-lockfiles.sh   # Conda-lock generation script
-│   └── configs/                    # Shared configuration files
-├── mamba-gvl/                      # Jupyter base image variant
-│   └── Dockerfile
-├── mamba-gvl-micro/                # Micromamba base image variant  
-│   └── Dockerfile
-├── docker_images.txt               # Build configuration
-├── build.sh                       # General build script
+runai_docker/
+├── environments/
+│   ├── gvl.yml                 # Full ML/AI conda environment  
+│   └── test.yml                # Minimal test environment
+├── scripts/
+│   ├── setup-dotfiles.sh       # Dotfiles setup script
+│   ├── generate-lockfiles.sh   # Simplified conda-lock generation
+│   ├── provision-gvl.sh        # Simplified provisioning script
+│   ├── user_env_install.sh     # Environment installation
+│   └── user_post_setup.sh      # Post-setup configuration
+├── configs/                    # Configuration files
+├── docker_images.txt           # Build configuration
+├── build.sh                   # Simplified build script
+├── test_simplified.sh         # Test script for simplified functionality
 └── README.md
 ```
 
@@ -116,28 +116,26 @@ Both images now use conda-lock for reproducible builds by default.
 Usage: ./build.sh [OPTIONS] [IMAGE_NAME]
 
 Build Docker images defined in docker_images.txt
-All images use conda-lock by default for reproducible builds.
 
 OPTIONS:
-    --all               Build all images in sequence
-    --push              Push to registry after build
-    --load              Load image to local Docker 
-    --tag TAG           Set image tag (default: latest)
-    --registry REG      Set registry prefix (default: mcuoco/)
-    --dry-run           Show what would be built without executing
-    --list              List available images
-    -h, --help          Show this help message
+    --all        Build all images
+    --push       Push to registry after build
+    --load       Load image locally
+    --tag TAG    Set image tag (default: latest)
+    --list       List available images
+    -h, --help   Show this help
 
 EXAMPLES:
-    ./build.sh --all                           # Build all images
-    ./build.sh mamba-gvl                       # Build specific image
-    ./build.sh --load mamba-gvl-micro          # Build and load locally
-    ./build.sh --push --tag v1.0 --all        # Build and push all with tag
+    ./build.sh --all                    # Build all images
+    ./build.sh mamba-gvl               # Build specific image
+    ./build.sh --load mamba-gvl-micro  # Build and load locally
+    ./build.sh --push --tag v1.0 --all # Build and push all
 
 LOCKFILES:
-    To use conda-lock for reproducible builds, generate lockfiles manually:
-    
-    ./shared/scripts/generate-lockfiles.sh shared/environments/gvl.yml
+    Generate lockfiles for reproducible builds:
+    ./scripts/generate-lockfiles.sh environments/gvl.yml
+    ./scripts/generate-lockfiles.sh environments/test.yml
+```
 ```
 
 ## 📋 Platform Support
@@ -203,7 +201,8 @@ runai workspace bash my-workspace
 
 ## 🧬 Shared Environment
 
-The `shared/environments/gvl.yml` environment includes:
+### Main Environment (gvl.yml)
+The `environments/gvl.yml` environment includes:
 
 - **PyTorch ecosystem:** pytorch, torchvision, torchaudio, pytorch-lightning
 - **ML/AI libraries:** transformers, datasets, scikit-learn, timm
@@ -211,15 +210,26 @@ The `shared/environments/gvl.yml` environment includes:
 - **Development tools:** jupyter, git, rich, wandb
 - **GPU support:** CUDA toolkit and drivers
 
+### Test Environment (test.yml)
+A minimal `environments/test.yml` environment for testing includes:
+
+- **Core Python:** python 3.11+
+- **Testing:** pytest
+- **Basic data:** numpy, pandas
+- **Development:** jupyter, git
+
+This lightweight environment is perfect for testing scripts and basic functionality without the overhead of the full ML stack.
+
 ## 🔄 Development Workflow
 
-### 1. Modify Shared Resources
+### 1. Modify Resources
 ```bash
-# Edit environment
-vim shared/environments/gvl.yml
+# Edit environments
+vim environments/gvl.yml     # Main ML environment
+vim environments/test.yml    # Test environment
 
 # Update scripts
-vim shared/scripts/setup-dotfiles.sh
+vim scripts/setup-dotfiles.sh
 ```
 
 ### 2. Build and Test
@@ -228,16 +238,14 @@ vim shared/scripts/setup-dotfiles.sh
 ./build.sh --load mamba-gvl
 
 # Generate lockfiles for reproducible builds
-./shared/scripts/generate-lockfiles.sh shared/environments/gvl.yml
+./scripts/generate-lockfiles.sh environments/gvl.yml
+./scripts/generate-lockfiles.sh environments/test.yml
 
 # Build with lockfiles (reproducible)
 ./build.sh --load mamba-gvl
 
-# Test with dry run mode
-./build.sh --dry-run --all
-
-# Try the example workflow
-./examples/lockfile-workflow.sh
+# Test simplified scripts
+./test_simplified.sh
 ```
 
 ### 3. Deploy
@@ -258,8 +266,8 @@ mamba-gvl-micro		mamba-gvl-micro/Dockerfile	base_directory_build,ssh_enabled
 
 ### Shared Scripts
 - `setup-dotfiles.sh`: Clones and sets up development dotfiles
-- `start-ssh-jupyter.sh`: Intelligent startup script for SSH + Jupyter
 - `generate-lockfiles.sh`: Creates linux-64 lockfiles from environment.yml
+- `provision-gvl.sh`: Simplified image provisioning script
 
 ## 🔍 Troubleshooting
 
