@@ -2,19 +2,45 @@
 # Multi-target stack Dockerfile for GVL images (root paths)
 
 # ============ Base: micromamba minimal ============
-FROM mambaorg/micromamba:2.3.0 AS base-micromamba
+FROM mambaorg/micromamba:2.3.2 AS base-micromamba
+ARG ENVIRONMENT_FILE=gvl.yml
 USER root
 
-COPY configs/ssh/sshd_config /etc/ssh/sshd_config
-COPY environments/ /tmp/env/
-COPY scripts/setup-dotfiles.sh /root/setup-dotfiles.sh
-COPY scripts/user_env_install.sh /root/user_env_install.sh
-COPY scripts/user_post_setup.sh /root/user_post_setup.sh
-COPY scripts/provision-gvl.sh /root/provision-gvl.sh
+# Files
 COPY apt-packages.txt /apt-packages.txt
-RUN --mount=type=secret,id=user_password \
-    chmod +x /root/provision-gvl.sh /root/setup-dotfiles.sh && \
-    NEW_USER=mcuoco NEW_USER_ID=2022 NEW_USER_GID=2022 /root/provision-gvl.sh
+COPY environments/ /tmp/env/
+COPY configs/ssh/sshd_config /etc/ssh/sshd_config
+COPY scripts/user-setup.sh /root/user-setup.sh
+
+# Packages and SSHD dir
+RUN apt-get update && \
+xargs -a /apt-packages.txt -r apt-get install -y --no-install-recommends && \
+apt-get clean && rm -rf /var/lib/apt/lists/* && \
+mkdir -p /var/run/sshd && chmod 755 /var/run/sshd
+
+# Generate SSH host keys at build time
+RUN ssh-keygen -A
+
+# User setup
+RUN chmod +x /root/user-setup.sh && \
+NEW_USER=${NEW_USER} NEW_USER_ID=${NEW_USER_ID} NEW_USER_GID=${NEW_USER_GID} /root/user-setup.sh
+
+# micromamba root prefix and env install
+ENV NEW_USER=mcuoco NEW_USER_ID=2022 NEW_USER_GID=2022
+
+# MAMBA_ROOT_PREFIX and MAMBA_EXE exist from parent image
+RUN mkdir -p "$MAMBA_ROOT_PREFIX" && \
+chown -R ${NEW_USER_ID}:${NEW_USER_GID} "$MAMBA_ROOT_PREFIX" && \
+$MAMBA_EXE install --yes --root-prefix "$MAMBA_ROOT_PREFIX" --name base --file "/tmp/env/${ENVIRONMENT_FILE}" && \
+$MAMBA_EXE clean --all --yes && \
+chown -R ${NEW_USER_ID}:${NEW_USER_GID} "$MAMBA_ROOT_PREFIX"
+
+# Dotfiles setup as user
+USER $NEW_USER
+COPY scripts/setup-dotfiles.sh /home/${NEW_USER}/setup-dotfiles.sh
+COPY scripts/user_post_setup.sh /home/${NEW_USER}/user_post_setup.sh
+RUN /home/${NEW_USER}/setup-dotfiles.sh && /home/${NEW_USER}/user_post_setup.sh
+
 
 # ============ Target: mamba-gvl-micro ============
 FROM base-micromamba AS mamba-gvl-micro
@@ -25,57 +51,3 @@ ENV CONDA_DEFAULT_ENV=base
 EXPOSE 22 6006
 USER root
 CMD ["/usr/sbin/sshd", "-D"]
-
-# ============ Base: jupyter minimal ============
-FROM jupyter/minimal-notebook AS base-jupyter
-USER root
-
-COPY configs/ssh/sshd_config /etc/ssh/sshd_config
-COPY environments/ /tmp/env/
-COPY scripts/setup-dotfiles.sh /root/setup-dotfiles.sh
-COPY scripts/user_env_install.sh /root/user_env_install.sh
-COPY scripts/user_post_setup.sh /root/user_post_setup.sh
-COPY scripts/provision-gvl.sh /root/provision-gvl.sh
-COPY apt-packages.txt /apt-packages.txt
-RUN --mount=type=secret,id=user_password \
-    chmod +x /root/provision-gvl.sh /root/setup-dotfiles.sh && \
-    NEW_USER=${NB_USER} NEW_USER_ID=${NB_UID} NEW_USER_GID=${NB_GID} /root/provision-gvl.sh
-
-# ============ Target: mamba-gvl (notebook) ============
-FROM base-jupyter AS mamba-gvl
-LABEL maintainer="Mike Cuoco <mcuoco@salk.edu>"
-LABEL build.type="locked"
-LABEL build.reproducible="true"
-ENV CONDA_DEFAULT_ENV=base
-EXPOSE 22 8888
-USER root
-CMD ["/usr/sbin/sshd", "-D"]
-
-# ============ Base: NVIDIA Parabricks ============
-FROM nvcr.io/nvidia/clara/clara-parabricks:latest AS base-parabricks
-USER root
-
-COPY configs/ssh/sshd_config /etc/ssh/sshd_config
-COPY environments/ /tmp/env/
-COPY scripts/setup-dotfiles.sh /root/setup-dotfiles.sh
-COPY scripts/user_env_install.sh /root/user_env_install.sh
-COPY scripts/user_post_setup.sh /root/user_post_setup.sh
-COPY scripts/provision-gvl.sh /root/provision-gvl.sh
-COPY apt-packages.txt /apt-packages.txt
-ENV NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility
-RUN --mount=type=secret,id=user_password \
-    chmod +x /root/provision-gvl.sh /root/setup-dotfiles.sh && \
-    NEW_USER=mcuoco NEW_USER_ID=2022 NEW_USER_GID=2022 /root/provision-gvl.sh
-
-# ============ Target: parabricks-gvl ============
-FROM base-parabricks AS parabricks-gvl
-LABEL maintainer="Mike Cuoco <mcuoco@salk.edu>"
-LABEL build.type="locked"
-LABEL build.reproducible="true"
-ENV CONDA_DEFAULT_ENV=base
-EXPOSE 22 6006
-USER root
-CMD ["/usr/sbin/sshd", "-D"]
-
-
