@@ -11,6 +11,7 @@ vim
 passwd
 
 openssh-server
+openssh-client
 
 git
 git-lfs
