@@ -1,21 +1,20 @@
 channels:
   - pytorch
   - nvidia
-  - huggingface
   - conda-forge
   - bioconda
   - nodefaults
 dependencies:
-  - python=3.11
+  - python>=3.11
 
   # PyTorch ecosystem (specify versions for better caching)
-  - pytorch::pytorch>=2.5
-  - pytorch::torchvision
-  - pytorch::torchaudio
-  - pytorch::torchtext
-  - pytorch::pytorch-cuda
-  - pytorch::lightning>=2.5.3
-  - nvidia::cuda-nvcc
+  - pytorch>=2.7.*
+  - pytorch-cuda=12.4
+  - lightning
+  - torchvision
+  - torchaudio
+  - torchtext
+  - cuda-nvcc
   - tensorboard
   - torch-tb-profiler
   
@@ -40,7 +39,7 @@ dependencies:
   - scikit-learn
   - einops
   - opt_einsum
-  - huggingface::transformers
+  - transformers
 
   # Data processing
   - opencv
