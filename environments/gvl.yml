@@ -6,7 +6,7 @@ channels:
   - bioconda
   - nodefaults
 dependencies:
-  - python>=3.11
+  - python=3.11
 
   # PyTorch ecosystem (specify versions for better caching)
   - pytorch::pytorch>=2.5
@@ -15,6 +15,7 @@ dependencies:
   - pytorch::torchtext
   - pytorch::pytorch-cuda
   - pytorch::lightning>=2.5.3
+  - nvidia::cuda-nvcc
   - tensorboard
   - torch-tb-profiler
   
