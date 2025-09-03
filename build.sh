@@ -47,9 +47,6 @@ build_image() {
     local full_image_name="${REGISTRY}${image_name}:${TAG}"
     local build_cmd="docker buildx build --platform $PLATFORM -t $full_image_name -f Dockerfile"
 
-    # Target the stage named after the image
-    build_cmd+=" --target ${image_name}"
-    
     # Append build args
     for arg in "${BUILD_ARGS[@]}"; do
         build_cmd+=" --build-arg ${arg}"

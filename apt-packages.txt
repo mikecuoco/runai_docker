@@ -9,7 +9,7 @@ screen
 htop
 vim
 passwd
-
+coreutils
 openssh-server
 openssh-client
 

@@ -2,7 +2,7 @@
 # Setup dotfiles script - run this after container starts
 # This keeps the Docker image smaller and improves layer caching
 
-set -e
+set -euo pipefail
 
 echo "Setting up dotfiles..."
 
